@@ -189,11 +189,12 @@
             { name: 'KSFY',         shortName: 'KSFY',   icon: 'fa-broadcast-tower' }
         ];
 
-        const RSS_URL = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=20';
-        const API_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
+        const RSS_URL = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=15';
+        const API_URL = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent('https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=15');
 
         let cachedItems = null;
         let scrollIntervalId = null;
+        let retryTimer = null;
 
         function getNewsCategory(title, description) {
             const content = (title + ' ' + description).toLowerCase();
@@ -304,20 +305,16 @@
         }
 
         async function fetchNews() {
-            if (!cachedItems) {
-                document.getElementById('loadingIndicator').style.display = 'block';
-            }
+            if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
 
             try {
-                const url = `${API_BASE}${encodeURIComponent(RSS_URL)}&_cb=${Date.now()}`;
-                const response = await fetch(url);
-
+                const response = await fetch(API_URL);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
                 const data = await response.json();
                 if (data.status !== 'ok' || !data.items?.length) throw new Error('No items');
 
                 cachedItems = data.items;
+                document.getElementById('errorMessage').style.display = 'none';
                 processNewsItems(data.items);
 
             } catch (err) {
@@ -325,10 +322,9 @@
                 if (cachedItems) {
                     processNewsItems(cachedItems);
                 } else {
-                    document.getElementById('loadingIndicator').style.display = 'none';
-                    document.getElementById('errorMessage').style.display = 'block';
-                    document.getElementById('errorMessage').textContent = 'Unable to load news. Retrying...';
-                    setTimeout(fetchNews, 15000);
+                    // Keep showing loading, retry every 10s silently
+                    document.getElementById('loadingIndicator').style.display = 'block';
+                    retryTimer = setTimeout(fetchNews, 10000);
                 }
             }
         }
