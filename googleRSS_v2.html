@@ -2,9 +2,6 @@
 <html>
 <head>
     <title>Local Sioux Falls Headlines</title>
-    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="pragma" content="no-cache">
-    <meta http-equiv="expires" content="0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @font-face {
@@ -70,11 +67,6 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transition: all 0.3s ease;
-        }
-        .icon-thumbnail:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
         }
         .icon-thumbnail i {
             font-size: 32px;
@@ -109,9 +101,6 @@
             font-weight: bold;
             display: block;
             margin-bottom: 8px;
-        }
-        .newsItem a:hover {
-            text-decoration: underline;
         }
         .newsSummary {
             color: #ffffff;
@@ -163,66 +152,45 @@
         const NEWS_CATEGORIES = {
             weather: {
                 keywords: ['weather', 'storm', 'forecast', 'temperature', 'snow', 'rain', 'climate'],
-                mainIcon: 'fa-cloud-sun',
                 bgIcon: 'fa-wind',
                 icons: ['fa-cloud-sun', 'fa-cloud-rain', 'fa-snowflake', 'fa-bolt', 'fa-temperature-high', 'fa-sun']
             },
             sports: {
                 keywords: ['sports', 'football', 'basketball', 'baseball', 'tournament', 'game', 'score'],
-                mainIcon: 'fa-trophy',
                 bgIcon: 'fa-running',
                 icons: ['fa-football', 'fa-basketball', 'fa-baseball-ball', 'fa-hockey-puck', 'fa-medal', 'fa-trophy']
             },
             business: {
                 keywords: ['business', 'economy', 'market', 'company', 'store', 'restaurant', 'financial'],
-                mainIcon: 'fa-chart-line',
                 bgIcon: 'fa-dollar-sign',
                 icons: ['fa-chart-line', 'fa-building', 'fa-briefcase', 'fa-store', 'fa-coins', 'fa-money-bill']
             },
             politics: {
                 keywords: ['government', 'mayor', 'council', 'vote', 'election', 'policy', 'senator'],
-                mainIcon: 'fa-landmark',
                 bgIcon: 'fa-flag-usa',
                 icons: ['fa-landmark', 'fa-gavel', 'fa-scale-balanced', 'fa-flag', 'fa-handshake', 'fa-scroll']
             },
             crime: {
                 keywords: ['police', 'crime', 'arrest', 'investigation', 'court', 'law', 'sheriff', 'homicide'],
-                mainIcon: 'fa-shield',
                 bgIcon: 'fa-balance-scale',
                 icons: ['fa-shield', 'fa-user-shield', 'fa-gavel', 'fa-bell', 'fa-exclamation-triangle']
             },
             community: {
                 keywords: ['community', 'event', 'festival', 'parade', 'celebration', 'local'],
-                mainIcon: 'fa-users',
                 bgIcon: 'fa-heart',
                 icons: ['fa-users', 'fa-hands-helping', 'fa-home', 'fa-star', 'fa-heart', 'fa-tree']
             }
         };
 
         const LOCAL_NEWS_SOURCES = [
-            {
-                name: 'KELO',
-                shortName: 'KELO',
-                icon: 'fa-tv'
-            },
-            {
-                name: 'Argus Leader',
-                shortName: 'ARGUS',
-                icon: 'fa-newspaper'
-            },
-            {
-                name: 'Dakota News',
-                shortName: 'DAKOTA',
-                icon: 'fa-radio'
-            },
-            {
-                name: 'KSFY',
-                shortName: 'KSFY',
-                icon: 'fa-broadcast-tower'
-            }
+            { name: 'KELO',         shortName: 'KELO',   icon: 'fa-tv' },
+            { name: 'Argus Leader', shortName: 'ARGUS',  icon: 'fa-newspaper' },
+            { name: 'Dakota News',  shortName: 'DAKOTA', icon: 'fa-radio' },
+            { name: 'KSFY',         shortName: 'KSFY',   icon: 'fa-broadcast-tower' }
         ];
 
-        const RSS_URL = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=100';
+        const RSS_URL = 'https://news.google.com/rss/search?q=location:Sioux+Falls+when:3d&hl=en-US&gl=US&ceid=US:en&num=20';
+        const API_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
 
         let cachedItems = null;
         let scrollIntervalId = null;
@@ -230,11 +198,26 @@
         function getNewsCategory(title, description) {
             const content = (title + ' ' + description).toLowerCase();
             for (const [category, data] of Object.entries(NEWS_CATEGORIES)) {
-                if (data.keywords.some(keyword => content.includes(keyword))) {
-                    return category;
-                }
+                if (data.keywords.some(kw => content.includes(kw))) return category;
             }
             return 'general';
+        }
+
+        function getColorSchemeForCategory(category) {
+            const schemes = {
+                weather:   ['87CEEB', '4682B4', '1E90FF'],
+                sports:    ['FF6B6B', 'FF8E8E', 'FFB4B4'],
+                business:  ['4CAF50', '66BB6A', '81C784'],
+                politics:  ['9C27B0', 'BA68C8', 'CE93D8'],
+                crime:     ['F44336', 'EF5350', 'E57373'],
+                community: ['FF9800', 'FFA726', 'FFB74D']
+            };
+            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
+        }
+
+        function extractSourceFromTitle(title) {
+            const parts = title.split(/[-–—|]/);
+            return parts.length > 1 ? parts[parts.length - 1].trim() : 'News';
         }
 
         function createThumbnail(title, description, source) {
@@ -256,15 +239,9 @@
                 div.appendChild(label);
             } else {
                 const category = getNewsCategory(title, description);
-                const categoryData = NEWS_CATEGORIES[category] || {
-                    mainIcon: 'fa-newspaper',
-                    bgIcon: 'fa-circle',
-                    icons: ['fa-newspaper']
-                };
-
+                const categoryData = NEWS_CATEGORIES[category] || { bgIcon: 'fa-circle', icons: ['fa-newspaper'] };
                 const colors = getColorSchemeForCategory(category);
-                const mainColor = colors[Math.floor(Math.random() * colors.length)];
-                div.style.backgroundColor = `#${mainColor}`;
+                div.style.backgroundColor = `#${colors[Math.floor(Math.random() * colors.length)]}`;
 
                 const mainIcon = document.createElement('i');
                 mainIcon.className = `fas ${categoryData.icons[Math.floor(Math.random() * categoryData.icons.length)]}`;
@@ -283,141 +260,75 @@
             return div;
         }
 
-        function getColorSchemeForCategory(category) {
-            const schemes = {
-                weather: ['87CEEB', '4682B4', '1E90FF'],
-                sports: ['FF6B6B', 'FF8E8E', 'FFB4B4'],
-                business: ['4CAF50', '66BB6A', '81C784'],
-                politics: ['9C27B0', 'BA68C8', 'CE93D8'],
-                crime: ['F44336', 'EF5350', 'E57373'],
-                community: ['FF9800', 'FFA726', 'FFB74D']
-            };
-            return schemes[category] || ['FB8807', 'FFA647', 'FFC487'];
-        }
-
-        function extractSourceFromTitle(title) {
-            const parts = title.split(/[-–—|]/);
-            if (parts.length > 1) {
-                return parts[parts.length - 1].trim();
-            }
-            return 'News Source';
-        }
-
         function processNewsItems(items) {
             const newsList = document.getElementById('newsList');
-            const loadingIndicator = document.getElementById('loadingIndicator');
-
+            document.getElementById('loadingIndicator').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
             newsList.innerHTML = '';
-            loadingIndicator.style.display = 'none';
 
-            console.log(`Processing ${items.length} news items`);
+            items
+                .sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))
+                .slice(0, 15)
+                .forEach(item => {
+                    const title = item.title || 'No Title';
+                    const link = item.link || '#';
+                    const description = item.description || '';
+                    const source = item.source?.title || extractSourceFromTitle(title) || 'News';
 
-            items.forEach((item, index) => {
-                const title = item.title || 'No Title';
-                const link = item.link || '#';
-                const description = item.description || '';
-                const pubDate = new Date(item.pubDate);
+                    const clean = description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+                    const short = clean.length > 150 ? clean.substring(0, 150) + '...' : clean;
 
-                let source = item.source?.title || extractSourceFromTitle(title) || 'News Source';
+                    const formattedDate = new Date(item.pubDate).toLocaleString('en-US', {
+                        timeZone: 'America/Chicago',
+                        weekday: 'short', month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
 
-                console.log(`Processing item ${index + 1}: ${title} - ${source}`);
+                    const newsItem = document.createElement('div');
+                    newsItem.className = 'newsItem';
 
-                const cleanDescription = description
-                    .replace(/<[^>]*>/g, '')
-                    .replace(/&nbsp;/g, ' ')
-                    .trim();
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'newsContent';
+                    contentDiv.innerHTML = `
+                        <a href="${link}" target="_blank">${title}</a>
+                        <div class="newsSummary">${short}</div>
+                        <div class="newsDate">${formattedDate}</div>
+                    `;
 
-                const shortDescription = cleanDescription.length > 150
-                    ? cleanDescription.substring(0, 150) + '...'
-                    : cleanDescription;
-
-                const newsItem = document.createElement('div');
-                newsItem.className = 'newsItem';
-
-                const thumbnail = createThumbnail(title, cleanDescription, source);
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'newsContent';
-
-                const formattedDate = pubDate.toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    newsItem.appendChild(createThumbnail(title, clean, source));
+                    newsItem.appendChild(contentDiv);
+                    newsList.appendChild(newsItem);
                 });
-
-                contentDiv.innerHTML = `
-                    <a href="${link}" target="_blank">${title}</a>
-                    <div class="newsSummary">${shortDescription}</div>
-                    <div class="newsDate">${formattedDate}</div>
-                `;
-
-                newsItem.appendChild(thumbnail);
-                newsItem.appendChild(contentDiv);
-                newsList.appendChild(newsItem);
-            });
 
             startScrolling();
         }
 
-        function loadJSONP(url, callbackName) {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    delete window[callbackName];
-                    script.remove();
-                    reject(new Error('JSONP timeout'));
-                }, 10000);
-
-                window[callbackName] = (data) => {
-                    clearTimeout(timeout);
-                    delete window[callbackName];
-                    script.remove();
-                    resolve(data);
-                };
-
-                const script = document.createElement('script');
-                script.src = url;
-                script.onerror = () => {
-                    clearTimeout(timeout);
-                    delete window[callbackName];
-                    script.remove();
-                    reject(new Error('JSONP script load error'));
-                };
-                document.head.appendChild(script);
-            });
-        }
-
         async function fetchNews() {
-            const errorMessage = document.getElementById('errorMessage');
-            const loadingIndicator = document.getElementById('loadingIndicator');
-
             if (!cachedItems) {
-                loadingIndicator.style.display = 'block';
+                document.getElementById('loadingIndicator').style.display = 'block';
             }
-            errorMessage.style.display = 'none';
-
-            const callbackName = 'rssCallback_' + Date.now();
-            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}&callback=${callbackName}&_cb=${Date.now()}`;
 
             try {
-                const data = await loadJSONP(apiUrl, callbackName);
+                const url = `${API_BASE}${encodeURIComponent(RSS_URL)}&_cb=${Date.now()}`;
+                const response = await fetch(url, { cache: 'no-store' });
 
-                if (data.status !== 'ok' || !data.items?.length) {
-                    throw new Error('No items returned');
-                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (data.status !== 'ok' || !data.items?.length) throw new Error('No items');
 
                 cachedItems = data.items;
-                console.log(`Fetched ${data.items.length} items`);
                 processNewsItems(data.items);
 
-            } catch (error) {
-                console.error('JSONP fetch failed:', error.message);
+            } catch (err) {
+                console.error('Fetch failed:', err.message);
                 if (cachedItems) {
                     processNewsItems(cachedItems);
                 } else {
-                    errorMessage.style.display = 'block';
-                    errorMessage.textContent = 'Unable to load news. Retrying...';
-                    loadingIndicator.style.display = 'none';
+                    document.getElementById('loadingIndicator').style.display = 'none';
+                    document.getElementById('errorMessage').style.display = 'block';
+                    document.getElementById('errorMessage').textContent = 'Unable to load news. Retrying...';
+                    setTimeout(fetchNews, 15000);
                 }
             }
         }
@@ -425,41 +336,31 @@
         function startScrolling() {
             const newsList = document.getElementById('newsList');
             const container = document.getElementById('reminderContent');
-            const scrollSpeed = 0.5;
+            let scrollPosition = 0;
             let isPaused = false;
 
-            // Clear any previous scroll interval to prevent stacking
-            if (scrollIntervalId) {
-                clearInterval(scrollIntervalId);
-            }
-
-            let scrollPosition = 0;
+            if (scrollIntervalId) clearInterval(scrollIntervalId);
             newsList.style.transform = 'translateY(0)';
 
             container.addEventListener('mouseenter', () => isPaused = true);
             container.addEventListener('mouseleave', () => isPaused = false);
 
             scrollIntervalId = setInterval(() => {
-                if (!isPaused && newsList.scrollHeight > container.clientHeight) {
-                    scrollPosition += scrollSpeed;
-                    const maxScroll = newsList.scrollHeight - container.clientHeight;
-
-                    if (scrollPosition >= maxScroll) {
-                        scrollPosition = 0;
-                        newsList.style.transition = 'none';
-                        newsList.style.transform = `translateY(0)`;
-
-                        void newsList.offsetWidth;
-
-                        newsList.style.transition = 'transform 0.5s ease';
-                    } else {
-                        newsList.style.transform = `translateY(-${scrollPosition}px)`;
-                    }
+                if (isPaused || newsList.scrollHeight <= container.clientHeight) return;
+                scrollPosition += 0.5;
+                const maxScroll = newsList.scrollHeight - container.clientHeight;
+                if (scrollPosition >= maxScroll) {
+                    scrollPosition = 0;
+                    newsList.style.transition = 'none';
+                    newsList.style.transform = 'translateY(0)';
+                    void newsList.offsetWidth;
+                    newsList.style.transition = 'transform 0.5s ease';
+                } else {
+                    newsList.style.transform = `translateY(-${scrollPosition}px)`;
                 }
             }, 50);
         }
 
-        // Initial fetch and refresh every 5 minutes
         fetchNews();
         setInterval(fetchNews, 300000);
     </script>
